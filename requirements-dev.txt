@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Тестирование
+pytest==8.3.3
+pytest-cov==5.0.0
+
+# SAST
+bandit==1.7.9
+semgrep==1.86.0
+
+# SCA
+pip-audit==2.7.3

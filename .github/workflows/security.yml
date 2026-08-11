@@ -1,0 +1,161 @@
+name: CI + Security Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1. UNIT TESTS
+  # ---------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run pytest with coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ---------------------------------------------------------------------
+  # 2. SAST — статический анализ кода (Bandit + Semgrep)
+  # ---------------------------------------------------------------------
+  sast:
+    name: SAST (Bandit + Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SAST tools
+        run: pip install bandit semgrep
+
+      - name: Run Bandit
+        run: bandit -r app -f json -o bandit-report.json || true
+
+      - name: Run Semgrep (public security ruleset)
+        run: semgrep --config p/security-audit --config p/flask --json --output semgrep-report.json app || true
+
+      - name: Upload SAST reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-reports
+          path: |
+            bandit-report.json
+            semgrep-report.json
+
+  # ---------------------------------------------------------------------
+  # 3. SCA — анализ уязвимостей зависимостей (pip-audit)
+  # ---------------------------------------------------------------------
+  sca:
+    name: SCA (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit against requirements
+        run: pip-audit -r requirements.txt -f json -o pip-audit-report.json || true
+
+      - name: Upload SCA report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-report
+          path: pip-audit-report.json
+
+  # ---------------------------------------------------------------------
+  # 4. IAST — runtime-мониторинг во время прогона тестов
+  # ---------------------------------------------------------------------
+  # Настоящий IAST — коммерческий агент (Contrast Security, Checkmarx IAST
+  # и т.д.), встраиваемый в рантайм. Здесь для демонстрации принципа
+  # запускается приложение с "toy IAST" middleware (app/iast_middleware.py),
+  # которая логирует потенциальные утечки непроверенных данных прямо
+  # во время прогона тестов/трафика.
+  # ---------------------------------------------------------------------
+  iast-demo:
+    name: IAST (демо runtime-мониторинга)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run app in background and send sample traffic
+        run: |
+          python -m app.app &
+          sleep 3
+          curl -s "http://localhost:5000/health"
+          curl -s -X POST "http://localhost:5000/todos" \
+            -H "Content-Type: application/json" \
+            -d '{"title": "<script>alert(1)</script>"}'
+          curl -s "http://localhost:5000/todos?debug=<script>alert(2)</script>" > /dev/null
+        continue-on-error: true
+
+      - name: Note
+        run: echo "Логи toy-IAST middleware см. в выводе шага выше (логгер toy_iast)."
+
+  # ---------------------------------------------------------------------
+  # 5. DAST — динамическое сканирование запущенного приложения (OWASP ZAP)
+  # ---------------------------------------------------------------------
+  dast:
+    name: DAST (OWASP ZAP baseline scan)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start app
+        run: |
+          nohup python -m app.app > app.log 2>&1 &
+          sleep 3
+
+      - name: Run OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.13.0
+        with:
+          target: "http://localhost:5000"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a"
+
+      - name: Upload app log (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log

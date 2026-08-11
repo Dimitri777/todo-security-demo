@@ -1,0 +1,3 @@
+# Формат: <id>	<threshold>	<newvalue>	<url>
+# Пример подавления ложного срабатывания (по умолчанию пусто):
+# 10021	WARN	IGNORE	http://localhost:5000/health
