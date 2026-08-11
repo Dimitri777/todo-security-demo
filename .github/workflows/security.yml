@@ -8,34 +8,7 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------
-  # 1. UNIT TESTS
-  # ---------------------------------------------------------------------
-  unit-tests:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements.txt
-
-      - name: Run pytest with coverage
-        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
-
-  # ---------------------------------------------------------------------
-  # 2. SAST — статический анализ кода (Bandit + Semgrep)
+  # 1. SAST — статический анализ кода (Bandit + Semgrep)
   # ---------------------------------------------------------------------
   sast:
     name: SAST (Bandit + Semgrep)
@@ -65,7 +38,7 @@ jobs:
             semgrep-report.json
 
   # ---------------------------------------------------------------------
-  # 3. SCA — анализ уязвимостей зависимостей (pip-audit)
+  # 2. SCA — анализ уязвимостей зависимостей (pip-audit)
   # ---------------------------------------------------------------------
   sca:
     name: SCA (pip-audit)
@@ -90,7 +63,7 @@ jobs:
           path: pip-audit-report.json
 
   # ---------------------------------------------------------------------
-  # 4. IAST — runtime-мониторинг во время прогона тестов
+  # 3. IAST — runtime-мониторинг во время прогона тестов
   # ---------------------------------------------------------------------
   iast-demo:
     name: IAST (демо runtime-мониторинга)
@@ -124,7 +97,7 @@ jobs:
         run: echo "Логи toy-IAST middleware см. в выводе шага выше (логгер toy_iast)."
 
   # ---------------------------------------------------------------------
-  # 5. DAST — динамическое сканирование запущенного приложения (OWASP ZAP)
+  # 4. DAST — динамическое сканирование запущенного приложения (OWASP ZAP)
   # ---------------------------------------------------------------------
   dast:
     name: DAST (OWASP ZAP baseline scan)

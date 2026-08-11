@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, abort
 
 from .iast_middleware import ToyIASTMiddleware
 
+
 app = Flask(__name__)
 
 # Простое runtime-инструментирование запросов (см. app/iast_middleware.py).
