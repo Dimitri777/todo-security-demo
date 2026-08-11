@@ -3,7 +3,7 @@ import time
 import requests
 import pytest
 from pathlib import Path
-
+import sys
 
 @pytest.fixture(scope="session", autouse=True)
 def app_server():
@@ -19,8 +19,8 @@ def app_server():
 
     # Запускаем Flask как подпроцесс
     proc = subprocess.Popen(
-        [str(python_executable), str(app_script)],
-        cwd=str(project_root)  # Рабочая директория — корень проекта
+        [sys.executable, "app/app.py"],  # sys.executable — путь к python внутри .venv
+        cwd=str(project_root)
     )
 
     # Даём серверу время запуститься
