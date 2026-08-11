@@ -2,15 +2,27 @@ import subprocess
 import time
 import requests
 import pytest
+from pathlib import Path
 
 
 @pytest.fixture(scope="session", autouse=True)
 def app_server():
+    # Получаем путь к текущему файлу (conftest.py)
+    current_file = Path(__file__)
+
+    # Получаем корень проекта (папка выше tests)
+    project_root = current_file.parent.parent
+
+    # Формируем относительные пути к скриптам
+    python_executable = project_root / ".venv" / "Scripts" / "python.exe"
+    app_script = project_root / "app" / "app.py"
+
     # Запускаем Flask как подпроцесс
     proc = subprocess.Popen(
-        [".venv\\Scripts\\python.exe", "app\\app.py"],
-        cwd="C:\\Users\\mrx\\Desktop\\ИЗУЧЕНИЕ ТЕСТИРОВАНИЯ\\todo-security-demo"
+        [str(python_executable), str(app_script)],
+        cwd=str(project_root)  # Рабочая директория — корень проекта
     )
+
     # Даём серверу время запуститься
     time.sleep(2)
 
