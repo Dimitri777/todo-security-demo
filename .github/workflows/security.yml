@@ -21,7 +21,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
 
       - name: Run pytest with coverage
         run: pytest --cov=app --cov-report=term-missing --cov-report=xml
@@ -90,12 +92,6 @@ jobs:
   # ---------------------------------------------------------------------
   # 4. IAST — runtime-мониторинг во время прогона тестов
   # ---------------------------------------------------------------------
-  # Настоящий IAST — коммерческий агент (Contrast Security, Checkmarx IAST
-  # и т.д.), встраиваемый в рантайм. Здесь для демонстрации принципа
-  # запускается приложение с "toy IAST" middleware (app/iast_middleware.py),
-  # которая логирует потенциальные утечки непроверенных данных прямо
-  # во время прогона тестов/трафика.
-  # ---------------------------------------------------------------------
   iast-demo:
     name: IAST (демо runtime-мониторинга)
     runs-on: ubuntu-latest
@@ -112,14 +108,17 @@ jobs:
 
       - name: Run app in background and send sample traffic
         run: |
+          # Запускаем сервер в фоне
           python -m app.app &
-          sleep 3
-          curl -s "http://localhost:5000/health"
+          # Увеличиваем паузу для гарантии старта
+          sleep 5
+          # Проверяем доступность
+          curl -f -s "http://localhost:5000/health" || (echo "Health check failed" && exit 1)
+          # Отправляем тестовые запросы
           curl -s -X POST "http://localhost:5000/todos" \
             -H "Content-Type: application/json" \
             -d '{"title": "<script>alert(1)</script>"}'
           curl -s "http://localhost:5000/todos?debug=<script>alert(2)</script>" > /dev/null
-        continue-on-error: true
 
       - name: Note
         run: echo "Логи toy-IAST middleware см. в выводе шага выше (логгер toy_iast)."
@@ -141,10 +140,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Start app
+      - name: Start app and wait for readiness
         run: |
+          # Запускаем сервер
           nohup python -m app.app > app.log 2>&1 &
-          sleep 3
+          # Даём время на старт
+          sleep 5
+          # Жёсткая проверка: если эндпоинт не доступен — остановим пайплайн
+          curl -f -s "http://localhost:5000/health" || (echo "App is not ready for DAST scan" && exit 1)
 
       - name: Run OWASP ZAP baseline scan
         uses: zaproxy/action-baseline@v0.13.0
