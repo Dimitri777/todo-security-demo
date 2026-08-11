@@ -13,7 +13,7 @@ from typing import Dict
 
 from flask import Flask, jsonify, request, abort
 
-from .iast_middleware import ToyIASTMiddleware
+from app.iast_middleware import ToyIASTMiddleware
 
 app = Flask(__name__)
 
